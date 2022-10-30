@@ -14,12 +14,13 @@ int maxSlaves = 1;
 int keyAssignment[42 * 1] = {}; // put ascii ID numbers in this array, this will then be accessed when sending keyboard commands
 byte connectionAttempts = 0;
 bool firstContact = false;
-byte runs = 0;
+byte digitalRuns = 0;
+byte analogRuns = 0;
 byte recieveingSlaveID = 0;
 byte slaveRuns = 0;
 
 byte digitalChangeWeight = 5;
-
+byte analogChangeWeight = 3;
 
 int wireReadInt()
 {
@@ -39,7 +40,7 @@ void readbutton()
   recieveingSlaveID = Wire.read();
 
   buttonState = Wire.read();
-  buttonState = keyData << 8;
+  buttonState = buttonState << 8;
   buttonState |= Wire.read();
 
   keyData = Wire.read();
@@ -47,6 +48,20 @@ void readbutton()
   keyData |= Wire.read();
 
   Serial.println("Button press recieved: " + String(recieveingSlaveID) + ", " + String(buttonState) + ", " + String(keyData)); // replace with key press later.
+}
+
+void readAnalog()
+{
+
+  int analogValue;
+
+  recieveingSlaveID = Wire.read();
+
+  analogValue = Wire.read();
+  analogValue = analogValue << 8;
+  analogValue |= Wire.read();
+
+  Serial.println("Analog Recieved: " + String(recieveingSlaveID) + ", " + String(analogValue)); // replace with key press later.
 }
 
 void getconfig()
@@ -156,10 +171,10 @@ void loop()
     {
       digitalLoadSize = Wire.read(); // read the load size from the slave
       analogLoadSize = Wire.read();  // read the load size from the slave
-      //slaveRuns = Wire.read();
+      // slaveRuns = Wire.read();
       Serial.println("Load Size Digital:" + String(digitalLoadSize));
       Serial.println("Load Size Analog:" + String(analogLoadSize));
-      //Serial.println("slave runs: " + String(slaveRuns));
+      // Serial.println("slave runs: " + String(slaveRuns));
 
       if (digitalLoadSize > 0 || analogLoadSize > 0)
       {
@@ -167,47 +182,83 @@ void loop()
         {
 
           // Wire.requestFrom(currentSlave,digitalLoadSize + analogLoadSize); // address, quantity --reqesting load from slave
-
+          //DIGITAL SECTION
           while (digitalLoadSize / 30 > 1) // start generating runs
           {
-            runs++;
+            digitalRuns++;
             digitalLoadSize = digitalLoadSize - 30;
           }
 
-          if (runs != 0)
+          if (digitalRuns == 0)
           {
-            Wire.requestFrom(currentSlave, 30);
-            Serial.println("Requesting Load: 30");
-            Serial.println("runs left: " + String(runs));
-            runs--;
-          }
-          if (runs == 0)
-          {
-            if (runs == 0 && digitalLoadSize > 0)
+            if (digitalRuns == 0 && digitalLoadSize > 0)
             {
               Wire.requestFrom(currentSlave, digitalLoadSize);
               Serial.println("Requesting Load: " + String(digitalLoadSize));
             }
           }
 
+          if (digitalRuns != 0)
+          {
+            Wire.requestFrom(currentSlave, 30);
+            Serial.println("Requesting Load: 30");
+            Serial.println("digitalRuns left: " + String(digitalRuns));
+            digitalRuns--; // converts a run back into a digital load size of 30 
+            digitalLoadSize = 30;
+          }
 
           Serial.println("Wire avalible button press: " + String(Wire.available()));
-         // while (Wire.available() > 0)
+          // while (Wire.available() > 0)
           //{ // read the button section of the load
-            for (int i = 0; i < digitalLoadSize / digitalChangeWeight; i++)
-            { // read the analog section of the load.
-              readbutton();
-            }
+          for (int i = 0; i < digitalLoadSize / digitalChangeWeight; i++)
+          { // read the analog section of the load.
+            readbutton();
+          }
 
-            // for (int i = 0; i < analogLoadSize / 3; i++)
-            // { // read the analog section of the load.
-            //   int potID;
-            //   potID = Wire.read();
-            //   wireRead = Wire.read();   // reads the first byte of the input
-            //   wireRead = wireRead << 8; // shifts the variable accross by a 8 bits to make room for the next one
-            //   wireRead |= Wire.read();  // reads the second byte of the input and appends to the end of the variable sets bits to 1 unless 0
-            //   Serial.println("Pot " + String(potID) + ":" + String(wireRead));
-            // }
+
+          //ANALOG SECTION
+
+          while (analogLoadSize / 30 > 1) // start generating runs
+          {
+            analogRuns++;
+            analogLoadSize = analogLoadSize - 30;
+          }
+
+          if (analogRuns == 0)
+          {
+            if (analogRuns == 0 && analogLoadSize > 0)
+            {
+              Wire.requestFrom(currentSlave, analogLoadSize);
+              Serial.println("Requesting Load: " + String(analogLoadSize));
+            }
+          }
+
+          if (analogRuns != 0)
+          {
+            Wire.requestFrom(currentSlave, 30);
+            Serial.println("Requesting Load: 30");
+            Serial.println("analogRuns left: " + String(analogRuns));
+            analogRuns--; // converts a run back into a digital load size of 30 
+            analogLoadSize = 30;
+          }
+
+          Serial.println("Wire avalible analog change: " + String(Wire.available()));
+          // while (Wire.available() > 0)
+          //{ // read the button section of the load
+          for (int i = 0; i < analogLoadSize / analogChangeWeight; i++)
+          { // read the analog section of the load.
+            readAnalog();
+          }
+
+          // for (int i = 0; i < analogLoadSize / 3; i++)
+          // { // read the analog section of the load.
+          //   int potID;
+          //   potID = Wire.read();
+          //   wireRead = Wire.read();   // reads the first byte of the input
+          //   wireRead = wireRead << 8; // shifts the variable accross by a 8 bits to make room for the next one
+          //   wireRead |= Wire.read();  // reads the second byte of the input and appends to the end of the variable sets bits to 1 unless 0
+          //   Serial.println("Pot " + String(potID) + ":" + String(wireRead));
+          // }
           //}
         }
       }
