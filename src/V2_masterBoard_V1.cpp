@@ -243,13 +243,21 @@ void loop()
           }
 
           Serial.println("Wire avalible analog change: " + String(Wire.available()));
+          Serial.println("analog load size" + String(analogLoadSize));
           // while (Wire.available() > 0)
           //{ // read the button section of the load
           for (int i = 0; i < analogLoadSize / analogChangeWeight; i++)
           { // read the analog section of the load.
+
             readAnalog();
           }
 
+
+          // Wire.requestFrom(1,1);
+          // if  (Wire.available() == 1){
+          
+          // Serial.println(String(Wire.read()));
+          // }
           // for (int i = 0; i < analogLoadSize / 3; i++)
           // { // read the analog section of the load.
           //   int potID;
