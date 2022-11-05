@@ -6,21 +6,20 @@ byte wireRead;
 int p = 467;  // value of pulldown resistor
 int q = 1020; // value of pot max
 float y;
-int digitalLoadSize = 0;
-int analogLoadSize = 0;
+int LoadSize = 0;
+
 bool initilize = false;
 byte slaveAssignID = 1;
 int maxSlaves = 1;
 int keyAssignment[42 * 1] = {}; // put ascii ID numbers in this array, this will then be accessed when sending keyboard commands
 byte connectionAttempts = 0;
 bool firstContact = false;
-byte digitalRuns = 0;
-byte analogRuns = 0;
+byte Runs = 0;
+
 byte recieveingSlaveID = 0;
 byte slaveRuns = 0;
 
-byte digitalChangeWeight = 5;
-byte analogChangeWeight = 3;
+byte ChangeWeight = 6;
 
 int wireReadInt()
 {
@@ -31,38 +30,63 @@ int wireReadInt()
   return storageInt;
 }
 
-void readbutton()
+void readData()
 {
-
+  int analogValue;
   byte buttonState;
   int keyData;
+  byte moduleType;
 
-  recieveingSlaveID = Wire.read();
+  //Serial.println("Reading Data: ");
+  moduleType = Wire.read();
+  // Serial.println("Module Type: " + String(moduleType));
+  if (moduleType == 1)
+  {
 
-  buttonState = Wire.read();
-  buttonState = buttonState << 8;
-  buttonState |= Wire.read();
+    recieveingSlaveID = Wire.read();
 
-  keyData = Wire.read();
-  keyData = keyData << 8;
-  keyData |= Wire.read();
+    buttonState = Wire.read();
+    buttonState = buttonState << 8;
+    buttonState |= Wire.read();
 
-  Serial.println("Button press recieved: " + String(recieveingSlaveID) + ", " + String(buttonState) + ", " + String(keyData)); // replace with key press later.
+    keyData = Wire.read();
+    keyData = keyData << 8;
+    keyData |= Wire.read();
+
+    Serial.println("Button press recieved: " + String(moduleType) + String(recieveingSlaveID) + ", " + String(buttonState) + ", " + String(keyData)); // replace with key press later.
+  }
+
+  if (moduleType == 2)
+  {
+
+    recieveingSlaveID = Wire.read();
+
+    analogValue = Wire.read();
+    analogValue = analogValue << 8;
+    analogValue |= Wire.read();
+
+    Wire.read(); // purge padding from analog signal.
+    Wire.read();
+
+    Serial.println("Analog Recieved: " + String(moduleType) + ", " + String(recieveingSlaveID) + ", " + String(analogValue)); // replace with key press later.
+  }
+  //LoadSize = LoadSize - ChangeWeight;
+  return;
 }
 
-void readAnalog()
-{
+// void readAnalog()
+// {
 
-  int analogValue;
+//   int analogValue;
 
-  recieveingSlaveID = Wire.read();
+//   recieveingSlaveID = Wire.read();
 
-  analogValue = Wire.read();
-  analogValue = analogValue << 8;
-  analogValue |= Wire.read();
+//   analogValue = Wire.read();
+//   analogValue = analogValue << 8;
+//   analogValue |= Wire.read();
 
-  Serial.println("Analog Recieved: " + String(recieveingSlaveID) + ", " + String(analogValue)); // replace with key press later.
-}
+//   Serial.println("Analog Recieved: " + String(recieveingSlaveID) + ", " + String(analogValue)); // replace with key press later.
+// }
 
 void getconfig()
 {
@@ -164,98 +188,98 @@ void loop()
     // Serial.println("Prep Load Size");
     // Wire.endTransmission(); // end transmission
 
-    Wire.requestFrom(currentSlave, 2); // address, quantity -- requesting load size // request digital and analog load size
+    Wire.requestFrom(currentSlave, 1); // address, quantity -- requesting load size
     Serial.println("Current wire avalible: " + String(Wire.available()));
 
     if (Wire.available() > 0)
     {
-      digitalLoadSize = Wire.read(); // read the load size from the slave
-      analogLoadSize = Wire.read();  // read the load size from the slave
+      LoadSize = Wire.read(); // read the load size from the slave
       // slaveRuns = Wire.read();
-      Serial.println("Load Size Digital:" + String(digitalLoadSize));
-      Serial.println("Load Size Analog:" + String(analogLoadSize));
+      Serial.println("Load Size Digital:" + String(LoadSize));
       // Serial.println("slave runs: " + String(slaveRuns));
 
-      if (digitalLoadSize > 0 || analogLoadSize > 0)
+      if (LoadSize > 0)
       {
-        if (digitalLoadSize != 255 || analogLoadSize != 255)
+        if (LoadSize != 255)
         {
 
           // Wire.requestFrom(currentSlave,digitalLoadSize + analogLoadSize); // address, quantity --reqesting load from slave
-          //DIGITAL SECTION
-          while (digitalLoadSize / 30 > 1) // start generating runs
+          // DIGITAL SECTION
+          while (LoadSize / 30 > 1) // start generating runs
           {
-            digitalRuns++;
-            digitalLoadSize = digitalLoadSize - 30;
+            Runs++;
+            LoadSize = LoadSize - 30;
           }
-
-          if (digitalRuns == 0)
+          while (Runs > 0 || LoadSize > 0)
           {
-            if (digitalRuns == 0 && digitalLoadSize > 0)
+            if (Runs < 1 && LoadSize > 0)
             {
-              Wire.requestFrom(currentSlave, digitalLoadSize);
-              Serial.println("Requesting Load: " + String(digitalLoadSize));
+              // Wire.requestFrom(currentSlave, LoadSize);
+              Serial.println("Requesting Load: " + String(LoadSize)); 
+              for (int i = 0; i < LoadSize / ChangeWeight; i++)
+              { // read the analog section of the load.
+                //Serial.println("Load Size: " + String(LoadSize));
+                Wire.requestFrom(currentSlave, ChangeWeight);// requests have to be put in individualy
+                //Serial.println("i Value: " + String(i));
+                if (Wire.available() > 0){
+                readData();
+                }
+              }
+              LoadSize = 0;
             }
-          }
 
-          if (digitalRuns != 0)
-          {
-            Wire.requestFrom(currentSlave, 30);
-            Serial.println("Requesting Load: 30");
-            Serial.println("digitalRuns left: " + String(digitalRuns));
-            digitalRuns--; // converts a run back into a digital load size of 30 
-            digitalLoadSize = 30;
-          }
-
-          Serial.println("Wire avalible button press: " + String(Wire.available()));
-          // while (Wire.available() > 0)
-          //{ // read the button section of the load
-          for (int i = 0; i < digitalLoadSize / digitalChangeWeight; i++)
-          { // read the analog section of the load.
-            readbutton();
-          }
-
-
-          //ANALOG SECTION
-
-          while (analogLoadSize / 30 > 1) // start generating runs
-          {
-            analogRuns++;
-            analogLoadSize = analogLoadSize - 30;
-          }
-
-          if (analogRuns == 0)
-          {
-            if (analogRuns == 0 && analogLoadSize > 0)
+            if (Runs > 0) // refills the runs with another 30 and takes a round off the runs
             {
-              Wire.requestFrom(currentSlave, analogLoadSize);
-              Serial.println("Requesting Load: " + String(analogLoadSize));
+              //Wire.requestFrom(currentSlave, 30);
+              Serial.println("Requesting Load: 30");
+              Serial.println("Runs left: " + String(Runs));
+              Runs--; // converts a run back into a load size of 30
+              LoadSize = 30;
             }
+
+            // Serial.println("Wire avalible: " + String(Wire.available()));
+            // Serial.println("Load Size: " + String(LoadSize));
           }
 
-          if (analogRuns != 0)
-          {
-            Wire.requestFrom(currentSlave, 30);
-            Serial.println("Requesting Load: 30");
-            Serial.println("analogRuns left: " + String(analogRuns));
-            analogRuns--; // converts a run back into a digital load size of 30 
-            analogLoadSize = 30;
-          }
+          // //ANALOG SECTION
 
-          Serial.println("Wire avalible analog change: " + String(Wire.available()));
-          Serial.println("analog load size" + String(analogLoadSize));
-          // while (Wire.available() > 0)
-          //{ // read the button section of the load
-          for (int i = 0; i < analogLoadSize / analogChangeWeight; i++)
-          { // read the analog section of the load.
+          // while (analogLoadSize / 30 > 1) // start generating runs
+          // {
+          //   analogRuns++;
+          //   analogLoadSize = analogLoadSize - 30;
+          // }
 
-            readAnalog();
-          }
+          // if (analogRuns == 0)
+          // {
+          //   if (analogRuns == 0 && analogLoadSize > 0)
+          //   {
+          //     Wire.requestFrom(currentSlave, analogLoadSize);
+          //     Serial.println("Requesting Load: " + String(analogLoadSize));
+          //   }
+          // }
 
+          // if (analogRuns != 0)
+          // {
+          //   Wire.requestFrom(currentSlave, 30);
+          //   Serial.println("Requesting Load: 30");
+          //   Serial.println("analogRuns left: " + String(analogRuns));
+          //   analogRuns--; // converts a run back into a digital load size of 30
+          //   analogLoadSize = 30;
+          // }
+
+          // Serial.println("Wire avalible analog change: " + String(Wire.available()));
+          // Serial.println("analog load size" + String(analogLoadSize));
+          // // while (Wire.available() > 0)
+          // //{ // read the button section of the load
+          // for (int i = 0; i < analogLoadSize / analogChangeWeight; i++)
+          // { // read the analog section of the load.
+
+          //   readAnalog();
+          // }
 
           // Wire.requestFrom(1,1);
           // if  (Wire.available() == 1){
-          
+
           // Serial.println(String(Wire.read()));
           // }
           // for (int i = 0; i < analogLoadSize / 3; i++)
