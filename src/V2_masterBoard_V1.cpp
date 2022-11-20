@@ -25,6 +25,16 @@ byte layoutsRecieved = 1;
 byte layoutRow = 0;
 bool VERBOSE = true;
 
+int holdingArray[6][7] = {
+    //holding array for transfering to and form PC software
+    {0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0},
+};
+
 int wireReadInt()
 {
   int storageInt = 0;
@@ -78,16 +88,18 @@ void readData()
   return;
 }
 
-void readLayout()
+void readLayout(byte row)
 {
-  Serial.println(" ");
+  //Serial.println(" ");
   int moduleID = 0;
   for(int col = 0; col < 7; col++)
   {
     moduleID = Wire.read();// read each module assignment for the row.  X 6
     moduleID = moduleID << 8;
     moduleID |= Wire.read();
-    Serial.print(String(moduleID) + " ");
+    // Serial.print(String(moduleID) + " ");
+    holdingArray[row][col] = moduleID;
+    Serial.print(String(moduleID) + "|");
   }
  
 }
@@ -153,23 +165,25 @@ Serial.println("Start");
   
   while (layoutsRecieved < maxSlaves)
   {
-  Serial.println("----PRINTING SLAVE-"+String(layoutsRecieved)+" LAYOUT----");
+    Serial.println(" ");
+    Serial.println("*Slave*");
     for (int row = 0; row < 6; row++)
     {
       Wire.requestFrom(layoutsRecieved, 14);
 
       if (Wire.available() > 0)
       {
-        readLayout();
+        readLayout(row);
         layoutRow++;
       }
 
 
     }
     layoutsRecieved++;
- Serial.println(" ");
+    Serial.println(" ");
   
   }
+  Serial.println("*Slaves Sent*");
 
   
 }
@@ -183,6 +197,8 @@ void loop()
   if(VERBOSE){Serial.println("\r");}
   //delay(10);
   //Serial.println("running");
+
+
 
   for (int currentSlave = 1; currentSlave < maxSlaves; currentSlave++)
   {
