@@ -25,6 +25,8 @@ byte layoutsRecieved = 1;
 byte layoutRow = 0;
 bool VERBOSE = true;
 
+bool pauseState = false;
+
 int holdingArray[6][7] = {
     //holding array for transfering to and form PC software
     {0, 0, 0, 0, 0, 0, 0},
@@ -144,6 +146,7 @@ Serial.println("Start");
     { // sending the next avalible ID number to the slave
       Wire.beginTransmission(253);
       if(VERBOSE){Serial.println("Sending Slave ID: " + String(slaveAssignID));}
+      Wire.write(12); // making that it is not pause state // could be any value not 136 or 137
       Wire.write(slaveAssignID);
       Wire.endTransmission();
       firstContact = false; // end first contact mode
@@ -162,7 +165,7 @@ Serial.println("Start");
   maxSlaves = slaveAssignID; // increases the max slaves to the highest number of slaves added
                              // max slaves will be used later on
 
-  
+  // ADD FUNCTION HERE TO REPLACE THE LAYOUT AND 
   while (layoutsRecieved < maxSlaves)
   {
     Serial.println(" ");
@@ -190,77 +193,95 @@ Serial.println("Start");
 
 void loop()
 {
-  if(VERBOSE){delay(1000);}
-  // put trigger in for setting config mode = true
-  // call setconfig(boardID)  function boardID is sent from PC
-  // sequencily set each element of the array
-  if(VERBOSE){Serial.println("\r");}
-  //delay(10);
-  //Serial.println("running");
+  String serialIn = "";
+  serialIn = Serial.read();
+  if(serialIn == "136"){//number can be chosen later
+    pauseState = true;
+    Wire.beginTransmission(1);// change later to cycle through each slave
+    Wire.write(136);
+    Wire.endTransmission();
+  }
+  
+  if (serialIn == "137"){
+    pauseState = false;
+  }
+
+
+  if(pauseState == false){
+
+
+    if(VERBOSE){delay(1000);}
+    // put trigger in for setting config mode = true
+    // call setconfig(boardID)  function boardID is sent from PC
+    // sequencily set each element of the array
+    if(VERBOSE){Serial.println("\r");}
+    //delay(10);
+    //Serial.println("running");
 
 
 
-  for (int currentSlave = 1; currentSlave < maxSlaves; currentSlave++)
-  {
-    if(VERBOSE){Serial.println("Requesing Data from: Slave " + String(currentSlave));}
-
-    // Wire.beginTransmission(currentSlave); // start transmission to first slave board
-    // Wire.write(10);                       // tell sllave to prepare load size
-    // Serial.println("Prep Load Size");
-    // Wire.endTransmission(); // end transmission
-
-    Wire.requestFrom(currentSlave, 1); // address, quantity -- requesting load size
-    if(VERBOSE){Serial.println("Current wire avalible: " + String(Wire.available()));}
-
-    if (Wire.available() > 0)
+    for (int currentSlave = 1; currentSlave < maxSlaves; currentSlave++)
     {
-      LoadSize = Wire.read(); // read the load size from the slave
-      // slaveRuns = Wire.read();
-      if(VERBOSE){Serial.println("Load Size Digital:" + String(LoadSize));}
-      // Serial.println("slave runs: " + String(slaveRuns));
+      if(VERBOSE){Serial.println("Requesing Data from: Slave " + String(currentSlave));}
 
-      if (LoadSize > 0)
+      // Wire.beginTransmission(currentSlave); // start transmission to first slave board
+      // Wire.write(10);                       // tell sllave to prepare load size
+      // Serial.println("Prep Load Size");
+      // Wire.endTransmission(); // end transmission
+
+      Wire.requestFrom(currentSlave, 1); // address, quantity -- requesting load size
+      if(VERBOSE){Serial.println("Current wire avalible: " + String(Wire.available()));}
+
+      if (Wire.available() > 0)
       {
-        if (LoadSize != 255)
+        LoadSize = Wire.read(); // read the load size from the slave
+        // slaveRuns = Wire.read();
+        if(VERBOSE){Serial.println("Load Size Digital:" + String(LoadSize));}
+        // Serial.println("slave runs: " + String(slaveRuns));
+
+        if (LoadSize > 0)
         {
+          if (LoadSize != 255)
+          {
 
-          // Wire.requestFrom(currentSlave,digitalLoadSize + analogLoadSize); // address, quantity --reqesting load from slave
-          // DIGITAL SECTION
-          while (LoadSize / 30 > 1) // start generating runs
-          {
-            Runs++;
-            LoadSize = LoadSize - 30;
-          }
-          while (Runs > 0 || LoadSize > 0)
-          {
-            if (Runs < 1 && LoadSize > 0)
+            // Wire.requestFrom(currentSlave,digitalLoadSize + analogLoadSize); // address, quantity --reqesting load from slave
+            // DIGITAL SECTION
+            while (LoadSize / 30 > 1) // start generating runs
             {
-              // Wire.requestFrom(currentSlave, LoadSize);
-              if(VERBOSE){Serial.println("Requesting Load: " + String(LoadSize));}
-              for (int i = 0; i < LoadSize / ChangeWeight; i++)
-              { // read the analog section of the load.
-                // Serial.println("Load Size: " + String(LoadSize));
-                Wire.requestFrom(currentSlave, ChangeWeight); // requests have to be put in individualy
-                // Serial.println("i Value: " + String(i));
-                if (Wire.available() > 0)
-                {
-                  readData();
+              Runs++;
+              LoadSize = LoadSize - 30;
+            }
+            while (Runs > 0 || LoadSize > 0)
+            {
+              if (Runs < 1 && LoadSize > 0)
+              {
+                // Wire.requestFrom(currentSlave, LoadSize);
+                if(VERBOSE){Serial.println("Requesting Load: " + String(LoadSize));}
+                for (int i = 0; i < LoadSize / ChangeWeight; i++)
+                { // read the analog section of the load.
+                  // Serial.println("Load Size: " + String(LoadSize));
+                  Wire.requestFrom(currentSlave, ChangeWeight); // requests have to be put in individualy
+                  // Serial.println("i Value: " + String(i));
+                  if (Wire.available() > 0)
+                  {
+                    readData();
+                  }
                 }
+                LoadSize = 0;
               }
-              LoadSize = 0;
-            }
 
-            if (Runs > 0) // refills the runs with another 30 and takes a round off the runs
-            {
-              // Wire.requestFrom(currentSlave, 30);
-              if(VERBOSE){Serial.println("Requesting Load: 30");}
-              if(VERBOSE){Serial.println("Runs left: " + String(Runs));}
-              Runs--; // converts a run back into a load size of 30
-              LoadSize = 30;
-            }
+              if (Runs > 0) // refills the runs with another 30 and takes a round off the runs
+              {
+                // Wire.requestFrom(currentSlave, 30);
+                if(VERBOSE){Serial.println("Requesting Load: 30");}
+                if(VERBOSE){Serial.println("Runs left: " + String(Runs));}
+                Runs--; // converts a run back into a load size of 30
+                LoadSize = 30;
+              }
 
-            // Serial.println("Wire avalible: " + String(Wire.available()));
-            // Serial.println("Load Size: " + String(LoadSize));
+              // Serial.println("Wire avalible: " + String(Wire.available()));
+              // Serial.println("Load Size: " + String(LoadSize));
+            }
           }
         }
       }
